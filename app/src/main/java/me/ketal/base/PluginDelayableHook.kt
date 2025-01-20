@@ -26,8 +26,10 @@ import android.app.Activity
 import android.content.Context
 import android.view.View
 import cc.ioctl.util.HostInfo
+import io.github.qauxv.base.IEntityAgent
 import io.github.qauxv.base.ISwitchCellAgent
 import io.github.qauxv.base.IUiItemAgent
+import io.github.qauxv.base.RuntimeErrorTracer
 import io.github.qauxv.config.ConfigManager
 import io.github.qauxv.hook.BaseFunctionHook
 import io.github.qauxv.util.Initiator
@@ -109,8 +111,8 @@ abstract class PluginDelayableHook(keyName: String) : BaseFunctionHook(hookKey =
         lateinit var title: String
         var summary: String? = null
 
-        override val titleProvider: (IUiItemAgent) -> String = { title }
-        override val summaryProvider: ((IUiItemAgent, Context) -> String?) = { _, _ -> summary }
+        override val titleProvider: (IEntityAgent) -> String = { title }
+        override val summaryProvider: ((IEntityAgent, Context) -> String?) = { _, _ -> summary }
         override val valueState: MutableStateFlow<String?>? = null
         override val validator: ((IUiItemAgent) -> Boolean) = { isAvailable }
         override val switchProvider: ISwitchCellAgent by lazy {
@@ -132,8 +134,8 @@ abstract class PluginDelayableHook(keyName: String) : BaseFunctionHook(hookKey =
         lateinit var title: String
         var summary: String? = null
 
-        override val titleProvider: (IUiItemAgent) -> String = { title }
-        override val summaryProvider: ((IUiItemAgent, Context) -> String?) = { _, _ -> summary }
+        override val titleProvider: (IEntityAgent) -> String = { title }
+        override val summaryProvider: ((IEntityAgent, Context) -> String?) = { _, _ -> summary }
         override val valueState: MutableStateFlow<String?>? = null
         override val validator: ((IUiItemAgent) -> Boolean) = { isAvailable }
         override val switchProvider: ISwitchCellAgent? = null
@@ -158,5 +160,7 @@ abstract class PluginDelayableHook(keyName: String) : BaseFunctionHook(hookKey =
         }
 
     }
+
+    override val runtimeErrorDependentComponents: List<RuntimeErrorTracer>? get() = null
 
 }

@@ -27,15 +27,17 @@ import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import cc.hicore.ReflectUtil.MField
 import cc.ioctl.util.Reflex
+import com.github.kyuubiran.ezxhelper.utils.getFieldByType
+import com.github.kyuubiran.ezxhelper.utils.hookAfter
 import com.github.kyuubiran.ezxhelper.utils.paramCount
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
 import io.github.qauxv.base.annotation.FunctionHookEntry
 import io.github.qauxv.base.annotation.UiItemAgentEntry
 import io.github.qauxv.dsl.FunctionEntryRouter
 import io.github.qauxv.util.Initiator
 import io.github.qauxv.util.QQVersion
 import io.github.qauxv.util.requireMinQQVersion
+import io.github.qauxv.util.xpcompat.XC_MethodHook
+import io.github.qauxv.util.xpcompat.XposedBridge
 import me.ketal.util.hookMethod
 import xyz.nextalone.base.MultiItemDelayableHook
 import xyz.nextalone.util.clazz
@@ -118,7 +120,17 @@ object SimplifyQQSettings : MultiItemDelayableHook("na_simplify_qq_settings_mult
         // 免流量 单独处理
         if (activeItems.contains("免流量")) {
             // if() CUOpenCardGuideMng guideEntry
-            if (requireMinQQVersion(QQVersion.QQ_8_9_63)) {
+            if (requireMinQQVersion(QQVersion.QQ_9_0_30)) {
+                Initiator.loadClass("com.tencent.mobileqq.setting.main.MainSettingConfigProvider").method { it.returnType == List::class.java }!!
+                    .hookAfter { param ->
+                        param.result = (param.result as List<*>).filter { obj ->
+                            (((obj ?: return@filter true)::class.java.getFieldByType(List::class.java).get(obj)
+                                ?: return@filter true) as List<*>).firstOrNull {
+                                (it ?: return@firstOrNull false)::class.java.simpleName == "CUOpenCardItemProcessor"
+                            } == null
+                        }
+                    }
+            } else if (requireMinQQVersion(QQVersion.QQ_8_9_63_BETA_11345)) {
                 //Lcom/tencent/mobileqq/managers/CUOpenCardGuideMng;->b(I)Lcom/tencent/mobileqq/managers/CUOpenCardGuideMng$a;
                 Initiator.loadClass("com/tencent/mobileqq/managers/CUOpenCardGuideMng").let { clz ->
                     val m = clz.declaredMethods.single {

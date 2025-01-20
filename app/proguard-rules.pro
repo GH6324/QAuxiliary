@@ -18,8 +18,11 @@
 -keep class com.tencent.mmkv.** { *; }
 -keep class com.alphi.qhmk.** { *; }
 -keep class top.linl.** { *; }
+-keep class top.xunflash.** { *; }
 -keep class io.github.moonleeeaf.** { *; }
+-keep class io.github.fusumayuki.** { *; }
 -keep class awoo.linwenxuan04.** { *; }
+-keep class wang.allenyou.** { *; }
 
 -keepclasseswithmembernames class * {
     native <methods>;
@@ -73,9 +76,16 @@
 -dontwarn com.sun.jna.**
 -dontwarn edu.umd.cs.findbugs.annotations.**
 -dontwarn java.lang.instrument.**
+
+# Xposed API
+-dontwarn de.robv.android.xposed.**
+-dontwarn io.github.libxposed.api.**
+
 -keep class com.android.dx.** {
     *;
 }
 -keep class net.bytebuddy.** {
     *;
 }
+
+-dontoptimize

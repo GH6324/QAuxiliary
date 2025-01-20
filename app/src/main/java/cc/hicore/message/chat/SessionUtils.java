@@ -21,44 +21,50 @@
 
 package cc.hicore.message.chat;
 
-import android.text.TextUtils;
-import cc.hicore.QApp.QAppUtils;
-import cc.hicore.ReflectUtil.MField;
+import static cc.ioctl.util.HostInfo.requireMinTimVersion;
+
 import cc.hicore.ReflectUtil.XField;
 import cc.hicore.Utils.XLog;
-import com.tencent.qqnt.kernel.nativeinterface.Contact;
-import io.github.qauxv.bridge.SessionInfoImpl;
+import io.github.qauxv.bridge.kernelcompat.ContactCompat;
 import io.github.qauxv.util.Initiator;
-import java.lang.reflect.Field;
+import io.github.qauxv.util.TIMVersion;
+import java.io.Serializable;
 
 public class SessionUtils {
-    public static Contact AIOParam2Contact(Object AIOParam) {
+
+    public static ContactCompat AIOParam2Contact(Object AIOParam) {
         try {
             Object AIOSession = XField.obj(AIOParam).type(Initiator.loadClass("com.tencent.aio.data.AIOSession")).get();
             Object AIOContact = XField.obj(AIOSession).type(Initiator.loadClass("com.tencent.aio.data.AIOContact")).get();
-            Contact contact = new Contact();
+            ContactCompat contact = new ContactCompat();
             contact.setPeerUid(getCurrentPeerIDByAIOContact(AIOContact));
 
             int chatType = getCurrentChatTypeByAIOContact(AIOContact);
             contact.setChatType(chatType);
 
-            if (chatType == 4){
+            if (chatType == 4) {
                 contact.setGuildId(getCurrentGuildIDByAIOContact(AIOContact));
             }
             return contact;
-        }catch (Exception e){
-            XLog.e("SessionUtils.AIOParam2Contact",e);
+        } catch (Exception e) {
+            XLog.e("SessionUtils.AIOParam2Contact", e);
             return null;
         }
+    }
 
+    public static Serializable AIOParam2ContactRaw(Object AIOParam) {
+        return AIOParam2Contact(AIOParam).toKernelObject();
     }
+
     public static String getCurrentPeerIDByAIOContact(Object AIOContact) throws Exception {
-        return XField.obj(AIOContact).name("f").type(String.class).get();
+        return XField.obj(AIOContact).name(requireMinTimVersion(TIMVersion.TIM_4_0_95) ? "e" : "f").type(String.class).get();
     }
-    public static int getCurrentChatTypeByAIOContact(Object AIOContact) throws Exception{
-        return XField.obj(AIOContact).name("e").type(int.class).get();
+
+    public static int getCurrentChatTypeByAIOContact(Object AIOContact) throws Exception {
+        return XField.obj(AIOContact).name(requireMinTimVersion(TIMVersion.TIM_4_0_95) ? "d" : "e").type(int.class).get();
     }
-    public static String getCurrentGuildIDByAIOContact(Object AIOContact) throws Exception{
-        return XField.obj(AIOContact).name("g").type(String.class).get();
+
+    public static String getCurrentGuildIDByAIOContact(Object AIOContact) throws Exception {
+        return XField.obj(AIOContact).name(requireMinTimVersion(TIMVersion.TIM_4_0_95) ? "f" : "g").type(String.class).get();
     }
 }

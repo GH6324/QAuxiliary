@@ -31,7 +31,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import cc.ioctl.util.HookUtils;
-import de.robv.android.xposed.XC_MethodHook;
+import io.github.qauxv.util.xpcompat.XC_MethodHook;
 import io.github.qauxv.base.annotation.FunctionHookEntry;
 import io.github.qauxv.base.annotation.UiItemAgentEntry;
 import io.github.qauxv.dsl.FunctionEntryRouter;
@@ -67,13 +67,12 @@ public class SortTroopSettingAppListView extends CommonSwitchFunctionHook {
         try {
             //由于我记得是qq是在8996重构了群设置页面 但是网上并无此版本安装包记录 所以决定采用异常捕获的方法来适配已经重构了群设置页的QQ
             Class<?> troopSettingFragmentV2 = ClassUtils.getClass("com.tencent.mobileqq.troop.troopsetting.activity.TroopSettingFragmentV2");
-            Method onViewCreatedAfterPartInitMethod = MethodTool.find(troopSettingFragmentV2)
-                    .name("onViewCreatedAfterPartInit")
-                    .params(android.view.View.class, android.os.Bundle.class)
-                    .returnType(void.class)
+            Method assemblePartsMethod = MethodTool.find(troopSettingFragmentV2)
+                    .name("assembleParts")
+                    .returnType(List.class)
                     .get();
-            HookUtils.hookBeforeIfEnabled(this,onViewCreatedAfterPartInitMethod,param -> {
-                List<Object> partList = FieldUtils.getFirstField(param.thisObject, List.class);
+            HookUtils.hookAfterIfEnabled(this,assemblePartsMethod,param -> {
+                List<Object> partList = (List<Object>) param.getResult();
                 Class<?> troopAppClass = ClassUtils.getClass("com.tencent.mobileqq.troop.troopsetting.part.TroopSettingAppPart");
                 Class<?> memberInfoPartClass = ClassUtils.getClass("com.tencent.mobileqq.troop.troopsetting.part.TroopSettingMemberInfoPart");
                 Object troopAppPart = null;

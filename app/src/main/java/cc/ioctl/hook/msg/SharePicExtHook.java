@@ -37,8 +37,8 @@ import cc.ioctl.util.HookUtils;
 import cc.ioctl.util.HostInfo;
 import cc.ioctl.util.Reflex;
 import cc.ioctl.util.ui.FaultyDialog;
-import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
+import io.github.qauxv.util.xpcompat.XC_MethodHook;
+import io.github.qauxv.util.xpcompat.XposedBridge;
 import io.github.qauxv.R;
 import io.github.qauxv.activity.ShadowShareFileAgentActivity;
 import io.github.qauxv.base.annotation.FunctionHookEntry;
@@ -94,6 +94,12 @@ public class SharePicExtHook extends CommonSwitchFunctionHook {
     @Override
     public String[] getUiItemLocation() {
         return FunctionEntryRouter.Locations.Auxiliary.MESSAGE_CATEGORY;
+    }
+
+    @Nullable
+    @Override
+    public String[] getExtraSearchKeywords() {
+        return new String[]{"跨应用分享图片"};
     }
 
     @Override

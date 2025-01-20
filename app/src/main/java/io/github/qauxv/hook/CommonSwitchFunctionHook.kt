@@ -26,8 +26,10 @@ import android.app.Activity
 import android.content.Context
 import android.view.View
 import cc.microblock.hook.pangu_spacing
+import io.github.qauxv.base.IEntityAgent
 import io.github.qauxv.base.ISwitchCellAgent
 import io.github.qauxv.base.IUiItemAgent
+import io.github.qauxv.base.RuntimeErrorTracer
 import io.github.qauxv.util.SyncUtils
 import io.github.qauxv.util.dexkit.DexKitTarget
 import kotlinx.coroutines.flow.StateFlow
@@ -68,9 +70,9 @@ abstract class CommonSwitchFunctionHook(
     override val uiItemAgent by lazy { uiItemAgent() }
 
     private fun uiItemAgent() = object : IUiItemAgent {
-        override val titleProvider: (IUiItemAgent) -> String = { _ -> pangu_spacing(name) }
-        override val summaryProvider: (IUiItemAgent, Context) -> CharSequence? = { _, _ ->
-            if(description is String)
+        override val titleProvider: (IEntityAgent) -> String = { _ -> pangu_spacing(name) }
+        override val summaryProvider: (IEntityAgent, Context) -> CharSequence? = { _, _ ->
+            if (description is String)
                 pangu_spacing(description.toString())
             else description
         }
@@ -92,4 +94,8 @@ abstract class CommonSwitchFunctionHook(
         override val extraSearchKeywordProvider: ((IUiItemAgent, Context) -> Array<String>?)?
             get() = extraSearchKeywords?.let { { _, _ -> it } }
     }
+
+    override val runtimeErrorDependentComponents: List<RuntimeErrorTracer>?
+        get() = null
+
 }

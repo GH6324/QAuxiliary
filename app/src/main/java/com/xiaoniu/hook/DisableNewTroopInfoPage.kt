@@ -22,7 +22,9 @@
 
 package com.xiaoniu.hook
 
+import com.github.kyuubiran.ezxhelper.utils.findMethod
 import com.github.kyuubiran.ezxhelper.utils.hookReturnConstant
+import com.github.kyuubiran.ezxhelper.utils.paramCount
 import io.github.qauxv.base.annotation.FunctionHookEntry
 import io.github.qauxv.base.annotation.UiItemAgentEntry
 import io.github.qauxv.dsl.FunctionEntryRouter
@@ -30,21 +32,21 @@ import io.github.qauxv.hook.CommonSwitchFunctionHook
 import io.github.qauxv.util.QQVersion
 import io.github.qauxv.util.dexkit.DexKit
 import io.github.qauxv.util.dexkit.TroopInfoCardPageABConfig
-import io.github.qauxv.util.requireMinQQVersion
+import io.github.qauxv.util.requireRangeQQVersion
 import xyz.nextalone.util.throwOrTrue
 
 @FunctionHookEntry
 @UiItemAgentEntry
 object DisableNewTroopInfoPage : CommonSwitchFunctionHook(arrayOf(TroopInfoCardPageABConfig)) {
+
     override val name = "禁用新版群资料页"
-
     override val description = "新版群资料页功能缺失，中看不中用，遂禁用之"
-
-    override val isAvailable = requireMinQQVersion(QQVersion.QQ_8_9_78)
+    override val uiItemLocation = FunctionEntryRouter.Locations.Auxiliary.GROUP_CATEGORY
+    override val isAvailable = requireRangeQQVersion(QQVersion.QQ_8_9_78, QQVersion.QQ_9_0_71)
 
     override fun initOnce() = throwOrTrue {
-        DexKit.requireMethodFromCache(TroopInfoCardPageABConfig).hookReturnConstant(false)
+        DexKit.requireClassFromCache(TroopInfoCardPageABConfig).findMethod {
+            returnType == Boolean::class.java && paramCount == 0
+        }.hookReturnConstant(false)
     }
-
-    override val uiItemLocation = FunctionEntryRouter.Locations.Auxiliary.GROUP_CATEGORY
 }

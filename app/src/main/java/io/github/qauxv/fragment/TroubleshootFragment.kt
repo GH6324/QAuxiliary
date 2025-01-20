@@ -28,6 +28,7 @@ import android.app.PendingIntent
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Looper
@@ -41,20 +42,28 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.AppCompatCheckBox
+import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.lifecycle.lifecycleScope
 import cc.ioctl.fragment.ExfriendListFragment
+import cc.ioctl.hook.misc.DisableHotPatch
 import cc.ioctl.util.ExfriendManager
 import cc.ioctl.util.HostInfo
 import cc.ioctl.util.LayoutHelper
 import cc.ioctl.util.Reflex
 import cc.ioctl.util.data.EventRecord
 import cc.ioctl.util.data.FriendRecord
+import cc.ioctl.util.ui.FaultyDialog
 import cc.ioctl.util.ui.ThemeAttrUtils
 import cc.ioctl.util.ui.dsl.RecyclerListViewController
-import de.robv.android.xposed.XposedBridge
+import com.github.kyuubiran.ezxhelper.utils.invokeAs
+import com.github.kyuubiran.ezxhelper.utils.isPublic
+import com.github.kyuubiran.ezxhelper.utils.isStatic
+import com.tencent.mmkv.MMKV
 import io.github.qauxv.R
 import io.github.qauxv.activity.SettingsUiFragmentHostActivity
 import io.github.qauxv.activity.SettingsUiFragmentHostActivity.Companion.createStartActivityForFragmentIntent
@@ -66,11 +75,11 @@ import io.github.qauxv.dsl.item.CategoryItem
 import io.github.qauxv.dsl.item.DslTMsgListItemInflatable
 import io.github.qauxv.dsl.item.TextSwitchItem
 import io.github.qauxv.lifecycle.ActProxyMgr
-import io.github.qauxv.startup.HookEntry
-import io.github.qauxv.startup.HybridClassLoader
+import io.github.qauxv.poststartup.StartupInfo
 import io.github.qauxv.tlb.ConfigTable.cacheMap
 import io.github.qauxv.ui.CustomDialog
 import io.github.qauxv.util.Initiator
+import io.github.qauxv.util.LoaderExtensionHelper
 import io.github.qauxv.util.Natives
 import io.github.qauxv.util.Toasts
 import io.github.qauxv.util.dexkit.DexKit
@@ -78,8 +87,11 @@ import io.github.qauxv.util.dexkit.DexKitTarget
 import io.github.qauxv.util.dexkit.ordinal
 import io.github.qauxv.util.dexkit.values
 import io.github.qauxv.util.hostInfo
+import io.github.qauxv.util.soloader.NativeLoader
 import me.ketal.base.PluginDelayableHook
 import me.singleneuron.hook.decorator.FxxkQQBrowser
+import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.system.exitProcess
 
 
@@ -133,7 +145,9 @@ class TroubleshootFragment : BaseRootLayoutFragment() {
                 textItem("打开X5调试页面", "内置浏览器调试页面", onClick = clickToOpenX5DebugPage)
                 textItem("打开内置浏览器", "使用内置浏览器打开指定页面", onClick = clickToOpenBrowser)
                 textItem("打开 DebugActivity", null, onClick = clickToStartHostDebugActivity)
+                textItem("打开指定 Activity", null, onClick = clickToStartActivity)
                 textItem("测试通知", "点击测试通知", onClick = clickToTestNotification)
+                textItem("清除 " + hostInfo.hostName + " 热补丁", "仅限测试，正常情况下不应执行此操作", onClick = clickToDeleteHotPatch)
             },
             CategoryItem("异常与崩溃测试") {
                 textItem("退出 Looper", "Looper.getMainLooper().quit() 没事别按", onClick = clickToTestCrashAction {
@@ -166,14 +180,7 @@ class TroubleshootFragment : BaseRootLayoutFragment() {
                 })
             },
             CategoryItem("调试信息") {
-                val statusInfo = "PID: " + android.os.Process.myPid() +
-                    ", UID: " + android.os.Process.myUid() +
-                    ", " + (if (android.os.Process.is64Bit()) "64 bit" else "32 bit") + "\n" +
-                    "Xposed API version: " + XposedBridge.getXposedVersion() + "\n" +
-                    HybridClassLoader.getXposedBridgeClassName() + "\n" +
-                    "module: " + HookEntry.getModulePath() + "\n" +
-                    "ctx.dataDir: " + hostInfo.application.dataDir
-                description(statusInfo, isTextSelectable = true)
+                description(generateStatusText(), isTextSelectable = true)
                 description(generateDebugInfo(), isTextSelectable = true)
             }
         )
@@ -222,8 +229,9 @@ class TroubleshootFragment : BaseRootLayoutFragment() {
         exitProcess(0)
     }
 
-    private val clickToResetDefaultConfig = confirmBeforeAction(
-        "此操作将删除该模块的所有配置信息,包括屏蔽通知的群列表,但不包括历史好友列表.点击确认后请等待3秒后手动重启" + hostInfo.hostName + ".\n此操作不可恢复"
+    private val clickToResetDefaultConfig = confirmTwiceBeforeAction(
+        "此操作将删除该模块的所有配置信息,包括屏蔽通知的群列表,但不包括历史好友列表.点击确认后请等待3秒后手动重启" + hostInfo.hostName + ".\n此操作不可恢复",
+        "删除所有配置信息"
     ) {
         ConfigManager.getCache().apply {
             clear()
@@ -237,12 +245,59 @@ class TroubleshootFragment : BaseRootLayoutFragment() {
         exitProcess(0)
     }
 
-    private val clickToClearRecoveredFriends = confirmBeforeAction(
+    private val clickToDeleteHotPatch = confirmTwiceBeforeActionWithExtraOption(
+        confirmMessage = "此操作将删除" + hostInfo.hostName + "的云控动态下发的热补丁, 通常情况下用户不应该执行此操作.\n" +
+            "删除热补丁后, 请自行重启" + hostInfo.hostName + "以使更改生效.",
+        secondConfirmCheckBoxText = "删除 " + hostInfo.hostName + " 的热补丁",
+        extraOptionCheckBoxText = "打开 \"" + DisableHotPatch.name + "\" 功能",
+        extraOptionCheckedByDefault = DisableHotPatch.isEnabled
+    ) { extraOptionEnabled ->
+        if (extraOptionEnabled) {
+            DisableHotPatch.isEnabled = true
+        }
+        val ctx = requireContext()
+        val dataDir = requireContext().dataDir
+        val rfixDir = File(dataDir, "rfix")
+        val hotpatchDir = File(requireContext().filesDir, "hotpatch")
+        fun deleteFileRecursively(file: File) {
+            if (file.isDirectory) {
+                file.listFiles()?.forEach { deleteFileRecursively(it) }
+            }
+            file.delete()
+        }
+        rfixDir.listFiles()?.forEach { deleteFileRecursively(it) }
+        hotpatchDir.listFiles()?.forEach { deleteFileRecursively(it) }
+        val sharedPrefsDir = File(dataDir, "shared_prefs")
+        val hotPatchConfigFile = File(sharedPrefsDir, "hotpatch_preference.xml")
+        if (hotPatchConfigFile.exists()) {
+            val sp = ctx.getSharedPreferences("hotpatch_preference", Context.MODE_PRIVATE)
+            sp.edit().clear().commit();
+            hotPatchConfigFile.delete()
+        }
+        if (File(ctx.filesDir, "mmkv/common_mmkv_configurations").exists()
+            && Initiator.checkHostHasClass("com.tencent.mmkv.MMKV")
+        ) {
+            // outer layer has try-catch, so ReflectiveOperationException is fine here
+            val kMMKV = Initiator.loadClass("com.tencent.mmkv.MMKV")
+            val mmkvWithID = kMMKV.declaredMethods.single {
+                it.returnType == kMMKV && it.isStatic && it.isPublic && run {
+                    val argt = it.parameterTypes
+                    argt.size == 2 && argt[0] == String::class.java && argt[1] == Int::class.java
+                }
+            }
+            mmkvWithID.invokeAs<SharedPreferences>(null, "common_mmkv_configurations", MMKV.MULTI_PROCESS_MODE)!!
+                .edit().putBoolean("rfix_patch_info#remove_patch", true).commit()
+        }
+        Toasts.success(requireContext(), "操作成功")
+    }
+
+    private val clickToClearRecoveredFriends = confirmTwiceBeforeAction(
         """
             此操作将删除当前账号(${getLongAccountUin()})下的 已恢复 的历史好友记录(记录可单独删除).
             如果因 BUG 大量好友被标记为已删除, 请先刷新好友列表, 然后再点击此按钮.
             此操作不可恢复
-            """.trimIndent()
+            """.trimIndent(),
+        "删除已恢复的好友记录"
     ) {
         val exm = ExfriendManager.getCurrent()
         val it: MutableIterator<*> = exm.events.entries.iterator()
@@ -258,11 +313,12 @@ class TroubleshootFragment : BaseRootLayoutFragment() {
         Toasts.success(requireContext(), "操作成功")
     }
 
-    private val clickToClearAllFriends = confirmBeforeAction(
+    private val clickToClearAllFriends = confirmTwiceBeforeAction(
         "此操作将删除当前账号(" + getLongAccountUin()
             + ")下的 全部 的历史好友记录, 通常您不需要进行此操作. \n" +
             "如果您的历史好友列表中因bug出现大量好友,请在联系人列表下拉刷新后点击 删除标记为已恢复的好友. \n" +
-            "此操作不可恢复"
+            "此操作不可恢复",
+        "删除所有好友记录"
     ) {
         val uin = getLongAccountUin()
         if (uin < 10000) {
@@ -301,6 +357,122 @@ class TroubleshootFragment : BaseRootLayoutFragment() {
         dialog.setMessage(confirmMessage)
         dialog.setTitle("确认操作")
         dialog.show()
+    }
+
+    private fun confirmTwiceBeforeAction(
+        confirmMessage: String,
+        secondConfirmCheckBoxText: String,
+        action: () -> Unit
+    ) = View.OnClickListener {
+        val ctx = requireContext()
+        val builder = AlertDialog.Builder(ctx)
+        builder.setPositiveButton(android.R.string.ok) { _, _ ->
+            try {
+                action()
+            } catch (e: Exception) {
+                CustomDialog.createFailsafe(ctx)
+                    .setTitle(Reflex.getShortClassName(e))
+                    .setCancelable(true)
+                    .setMessage(e.toString())
+                    .ok().show()
+            }
+        }
+        builder.setNegativeButton(android.R.string.cancel, null)
+        builder.setCancelable(true)
+        builder.setTitle("确认操作")
+        // create a linear layout to hold the message and checkbox
+        val layout = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            val padding = ctx.resources.getDimension(androidx.appcompat.R.dimen.abc_dialog_padding_material).toInt()
+            setPadding(padding, padding / 3, padding, 0)
+        }
+        val message = AppCompatTextView(ctx).apply {
+            text = confirmMessage
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextColor(ResourcesCompat.getColor(resources, R.color.firstTextColor, ctx.theme))
+        }
+        val checkBox = AppCompatCheckBox(ctx).apply {
+            text = secondConfirmCheckBoxText
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextColor(ResourcesCompat.getColor(resources, R.color.firstTextColor, ctx.theme))
+            isClickable = true
+            isChecked = false
+        }
+        layout.addView(message)
+        layout.addView(checkBox)
+        builder.setView(layout)
+        val dialog = builder.show()
+        // get positive button and set listener
+        val positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        checkBox.setOnCheckedChangeListener { _, isChecked ->
+            positiveButton.isEnabled = isChecked
+        }
+        positiveButton.isEnabled = false
+    }
+
+    private fun confirmTwiceBeforeActionWithExtraOption(
+        confirmMessage: String,
+        secondConfirmCheckBoxText: String,
+        extraOptionCheckBoxText: String,
+        extraOptionCheckedByDefault: Boolean,
+        action: (extraOptionChecked: Boolean) -> Unit
+    ) = View.OnClickListener {
+        val ctx = requireContext()
+        val builder = AlertDialog.Builder(ctx)
+        val checkBoxStatus = AtomicBoolean(extraOptionCheckedByDefault)
+        builder.setPositiveButton(android.R.string.ok) { _, _ ->
+            try {
+                action(checkBoxStatus.get())
+            } catch (e: Exception) {
+                CustomDialog.createFailsafe(ctx)
+                    .setTitle(Reflex.getShortClassName(e))
+                    .setCancelable(true)
+                    .setMessage(e.toString())
+                    .ok().show()
+            }
+        }
+        builder.setNegativeButton(android.R.string.cancel, null)
+        builder.setCancelable(true)
+        builder.setTitle("确认操作")
+        // create a linear layout to hold the message and checkbox
+        val layout = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            val padding = ctx.resources.getDimension(androidx.appcompat.R.dimen.abc_dialog_padding_material).toInt()
+            setPadding(padding, padding / 3, padding, 0)
+        }
+        val message = AppCompatTextView(ctx).apply {
+            text = confirmMessage
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextColor(ResourcesCompat.getColor(resources, R.color.firstTextColor, ctx.theme))
+        }
+        val checkBoxMain = AppCompatCheckBox(ctx).apply {
+            text = secondConfirmCheckBoxText
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextColor(ResourcesCompat.getColor(resources, R.color.firstTextColor, ctx.theme))
+            isClickable = true
+            isChecked = false
+        }
+        val checkBoxExtra = AppCompatCheckBox(ctx).apply {
+            text = extraOptionCheckBoxText
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextColor(ResourcesCompat.getColor(resources, R.color.firstTextColor, ctx.theme))
+            isClickable = true
+            isChecked = extraOptionCheckedByDefault
+        }
+        layout.addView(message)
+        layout.addView(checkBoxMain)
+        layout.addView(checkBoxExtra)
+        builder.setView(layout)
+        val dialog = builder.show()
+        // get positive button and set listener
+        val positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        checkBoxMain.setOnCheckedChangeListener { _, isChecked ->
+            positiveButton.isEnabled = isChecked
+        }
+        checkBoxExtra.setOnCheckedChangeListener { _, isChecked ->
+            checkBoxStatus.set(isChecked)
+        }
+        positiveButton.isEnabled = false
     }
 
     private fun actionOrShowError(action: () -> Unit) = View.OnClickListener {
@@ -421,6 +593,71 @@ class TroubleshootFragment : BaseRootLayoutFragment() {
         val browser = Initiator.loadClass("com.tencent.mobileqq.debug.DebugActivity")
         val intent = Intent(requireContext(), browser)
         startActivity(intent)
+    }
+
+    private val clickToStartActivity = actionOrShowError {
+        val ctx = requireContext()
+        val r = { comp: String ->
+            try {
+                val klass = Initiator.loadClass(if (comp.startsWith(".")) ctx.packageName + comp else comp)
+                val intent = Intent(requireContext(), klass)
+                startActivity(intent)
+            } catch (e: Throwable) {
+                FaultyDialog.show(ctx, e)
+            }
+        }
+        val input = EditText(ctx).apply {
+            id = R.id.input_value
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextColor(ResourcesCompat.getColor(resources, R.color.firstTextColor, ctx.theme))
+        }
+        AlertDialog.Builder(ctx).apply {
+            setTitle("请输入 Activity 类名")
+            setCancelable(true)
+            setNeutralButton(android.R.string.paste, null) // set listener later
+            setPositiveButton(android.R.string.ok, null)  // set listener later
+            setNegativeButton(android.R.string.cancel, null)
+            setView(input)
+        }.show().apply {
+            getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                val clipSvc = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = clipSvc.primaryClip
+                if (clip != null && clip.itemCount > 0) {
+                    input.setText(clip.getItemAt(0).text)
+                }
+            }
+            getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val url = input.text.toString()
+                if (url.isEmpty()) {
+                    Toasts.error(ctx, "Activity 不能为空")
+                    return@setOnClickListener
+                }
+                dismiss()
+                r(url)
+            }
+        }
+    }
+
+    private fun generateStatusText(): String {
+        val loader = StartupInfo.getLoaderService()
+        val hook = StartupInfo.requireHookBridge()
+        var statusInfo = "PID: " + android.os.Process.myPid() +
+            ", UID: " + android.os.Process.myUid() +
+            ", ISA: " + NativeLoader.getIsaName(NativeLoader.getPrimaryNativeLibraryIsa()) +
+            (if (NativeLoader.isSecondaryNativeLibraryNeeded(requireContext())) "+" +
+                NativeLoader.getIsaName(NativeLoader.getSecondaryNativeLibraryIsa()) else "") + "\n" +
+            "Xposed API version: " + hook.apiLevel + "\n" +
+            "module: " + StartupInfo.getModulePath() + "\n" +
+            "ctx.dataDir: " + hostInfo.application.dataDir + "\n"
+        statusInfo += loader.entryPointName + " " + loader.loaderVersionName + " (" + loader.loaderVersionCode + ")\n"
+        var xp = loader.queryExtension("GetXposedBridgeClass") as Class<*>?
+        if (xp == null) {
+            xp = loader.queryExtension("GetXposedInterfaceClass") as Class<*>?
+        }
+        statusInfo += "XposedBridge: " + (if (xp != null) xp.name else "null") + "\n"
+        statusInfo += hook.frameworkName + " " + hook.frameworkVersion + " (" + hook.frameworkVersionCode + ")\n"
+        statusInfo += "Hook counter: " + LoaderExtensionHelper.getHookCounter();
+        return statusInfo
     }
 
     private fun generateDebugInfo(): CharSequence {

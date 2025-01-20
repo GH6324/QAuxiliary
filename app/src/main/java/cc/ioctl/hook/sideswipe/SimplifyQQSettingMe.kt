@@ -26,6 +26,7 @@ import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.children
 import androidx.core.view.forEach
 import androidx.core.view.forEachIndexed
 import androidx.core.view.get
@@ -38,8 +39,6 @@ import com.github.kyuubiran.ezxhelper.utils.hookAfter
 import com.github.kyuubiran.ezxhelper.utils.hookReturnConstant
 import com.github.kyuubiran.ezxhelper.utils.paramCount
 import com.github.kyuubiran.ezxhelper.utils.setViewZeroSize
-import de.robv.android.xposed.XC_MethodReplacement
-import de.robv.android.xposed.XposedBridge
 import io.github.qauxv.base.annotation.FunctionHookEntry
 import io.github.qauxv.base.annotation.UiItemAgentEntry
 import io.github.qauxv.dsl.FunctionEntryRouter
@@ -52,21 +51,34 @@ import io.github.qauxv.util.QQVersion.QQ_8_6_0
 import io.github.qauxv.util.QQVersion.QQ_8_6_5
 import io.github.qauxv.util.QQVersion.QQ_8_8_11
 import io.github.qauxv.util.QQVersion.QQ_8_9_23
+import io.github.qauxv.util.QQVersion.QQ_9_0_20
+import io.github.qauxv.util.QQVersion.QQ_9_0_85
 import io.github.qauxv.util.dexkit.DexKit
-import io.github.qauxv.util.dexkit.QQSettingMeABTestHelper_isZPlanExpGroup
+import io.github.qauxv.util.dexkit.QQSettingMeABTestHelper_isZPlanExpGroup_New
+import io.github.qauxv.util.dexkit.QQSettingMeABTestHelper_isZplanExpGroup_Old
 import io.github.qauxv.util.dexkit.QQ_SETTING_ME_CONFIG_CLASS
 import io.github.qauxv.util.hostInfo
 import io.github.qauxv.util.requireMinQQVersion
+import io.github.qauxv.util.xpcompat.XC_MethodReplacement
+import io.github.qauxv.util.xpcompat.XposedBridge
 import xyz.nextalone.base.MultiItemDelayableHook
 import xyz.nextalone.util.*
 import java.lang.reflect.Array
+import java.lang.reflect.Modifier
 import java.util.SortedMap
 
 //侧滑栏精简
 @FunctionHookEntry
 @UiItemAgentEntry
 object SimplifyQQSettingMe :
-    MultiItemDelayableHook("SimplifyQQSettingMe", targets = arrayOf(QQ_SETTING_ME_CONFIG_CLASS, QQSettingMeABTestHelper_isZPlanExpGroup)) {
+    MultiItemDelayableHook(
+        "SimplifyQQSettingMe",
+        targets = arrayOf(
+            QQ_SETTING_ME_CONFIG_CLASS,
+            QQSettingMeABTestHelper_isZPlanExpGroup_New,
+            QQSettingMeABTestHelper_isZplanExpGroup_Old,
+        )
+    ) {
 
     const val MidContentName = "SimplifyQQSettingMe::MidContentName"
 
@@ -167,7 +179,15 @@ object SimplifyQQSettingMe :
         XposedBridge.hookAllConstructors(kQQSettingMeView, HookUtils.afterIfEnabled(this) { param ->
             //中间部分(QQ会员 我的钱包等)
             val midContentName = ConfigTable.getConfig<String>(MidContentName)
-            val midContentListLayout = if (requireMinQQVersion(QQ_8_6_5)) {
+            val midContentListLayout = if (requireMinQQVersion(QQ_9_0_85)) {
+                param.thisObject::class.java.declaredFields.firstOrNull {
+                    it.modifiers and (Modifier.STATIC or Modifier.FINAL or Modifier.PRIVATE) == Modifier.PRIVATE
+                        && it.type == LinearLayout::class.java
+                }?.let {
+                    it.isAccessible = true
+                    it.get(param.thisObject) as LinearLayout?
+                }
+            } else if (requireMinQQVersion(QQ_8_6_5)) {
                 param.thisObject.get(midContentName, LinearLayout::class.java)
             } else {
                 param.thisObject.get(midContentName, View::class.java) as LinearLayout
@@ -175,11 +195,13 @@ object SimplifyQQSettingMe :
             val midRemovedList: MutableList<Int> = mutableListOf()
             midContentListLayout?.forEach {
                 val child = it as LinearLayout
-                val tv = if (child.size == 1) {
+                val tv = (if (child.size == 1) {
                     (child[0] as LinearLayout)[1]
+                } else if (requireMinQQVersion(QQ_9_0_20) && child.size > 2) {
+                    child[2]
                 } else {
                     child[1]
-                } as TextView
+                }) as TextView
                 val text = tv.text.toString()
                 if (stringHit(text)) {
                     midRemovedList.add(midContentListLayout.indexOfChild(child))
@@ -198,9 +220,9 @@ object SimplifyQQSettingMe :
             val underSettingsLayout = if (id is Int && vg is ViewGroup) {
                 vg.findViewById(id)
             } else if (requireMinQQVersion(QQ_8_6_5)) {
-                val parent = midContentListLayout?.parent?.parent as ViewGroup
+                val parent = midContentListLayout?.parent?.parent as ViewGroup?
                 var ret: LinearLayout? = null
-                parent.forEach {
+                parent?.forEach {
                     if (it is LinearLayout && it[0] is LinearLayout) {
                         ret = it
                     }
@@ -211,7 +233,11 @@ object SimplifyQQSettingMe :
                 param.thisObject.get(underSettingsName, View::class.java) as? LinearLayout
             }
             val correctUSLayout: LinearLayout? =
-                if (requireMinQQVersion(QQ_8_9_23)) (underSettingsLayout as LinearLayout)[0] as LinearLayout else underSettingsLayout
+                if (requireMinQQVersion(QQ_8_9_23)) {
+                    (underSettingsLayout as LinearLayout?)?.get(0) as LinearLayout?
+                } else {
+                    underSettingsLayout
+                }
             correctUSLayout?.forEachIndexed { i, v ->
                 val tv = (v as LinearLayout)[1] as TextView
                 val text = tv.text
@@ -237,7 +263,8 @@ object SimplifyQQSettingMe :
 
         // for NT QQ 8.9.68.11450
         val clazz = Initiator.load(
-            if (requireMinQQVersion(QQVersion.QQ_8_9_88)) "com.tencent.mobileqq.QQSettingMeViewV9"
+            if (requireMinQQVersion(QQ_9_0_20)) "com.tencent.mobileqq.ab"
+            else if (requireMinQQVersion(QQVersion.QQ_8_9_88)) "com.tencent.mobileqq.QQSettingMeViewV9"
             else "com.tencent.mobileqq.activity.QQSettingMeViewV9"
         )
 
@@ -269,6 +296,25 @@ object SimplifyQQSettingMe :
                     Array.set(returnArray, i, purifiedList[i])
                 }
                 param.result = returnArray
+            }
+        }
+
+        // QQ 9.0.80 在xml布局中固定了14个item，这里将上面步骤完成后还未初始化的item隐藏
+        if (requireMinQQVersion(QQVersion.QQ_9_0_80)) {
+            "com.tencent.mobileqq.bizParts.QQSettingMeMenuPanelPart".clazz!!.method("onInitView")!!.hookAfter { param ->
+//                val parent=param.thisObject.javaClass.declaredFields.first {
+//                    it.javaClass==ViewGroup::class.java && (it.get(param.thisObject) as ViewGroup).childCount>=14
+//                }.get(param.thisObject) as ViewGroup
+//                val parent = param.thisObject.get("h") as ViewGroup
+                val parent = param.thisObject.javaClass.declaredFields.lastOrNull {
+                    it.type == ViewGroup::class.java
+                }?.let {
+                    it.isAccessible = true
+                    it.get(param.thisObject)
+                } as ViewGroup
+                parent.children.forEach {
+                    if (!it.isClickable) it.setViewZeroSize()
+                }
             }
         }
 
@@ -307,7 +353,11 @@ object SimplifyQQSettingMe :
 
         // 关闭下拉形象展示abtest开关
         if (activeItems.contains("下拉形象展示")) {
-            DexKit.requireMethodFromCache(QQSettingMeABTestHelper_isZPlanExpGroup).hookReturnConstant(false)
+            if (requireMinQQVersion(QQ_9_0_20)) {
+                DexKit.requireMethodFromCache(QQSettingMeABTestHelper_isZPlanExpGroup_New).hookReturnConstant(false)
+            } else {
+                DexKit.requireMethodFromCache(QQSettingMeABTestHelper_isZplanExpGroup_Old).hookReturnConstant(false)
+            }
         }
     }
 

@@ -30,11 +30,15 @@ import io.github.qauxv.dsl.FunctionEntryRouter
 import io.github.qauxv.hook.CommonSwitchFunctionHook
 import io.github.qauxv.util.Initiator
 import io.github.qauxv.util.QQVersion
+import io.github.qauxv.util.dexkit.DexKit
+import io.github.qauxv.util.dexkit.DisableLightInteractionMethod
 import io.github.qauxv.util.requireMinQQVersion
 
 @FunctionHookEntry
 @UiItemAgentEntry
-object DisableLightInteraction : CommonSwitchFunctionHook() {
+object DisableLightInteraction : CommonSwitchFunctionHook(
+    targets = arrayOf(DisableLightInteractionMethod)
+) {
 
     override val name = "禁用轻互动"
     override val description = "隐藏聊天列表有时出现的表情 (早上好, 戳一戳, 晚安) 点一下发一条消息然后消失"
@@ -44,9 +48,13 @@ object DisableLightInteraction : CommonSwitchFunctionHook() {
 
     override fun initOnce(): Boolean {
         val kLIAConfigManager = Initiator.loadClass("com.tencent.qqnt.biz.lightbusiness.lightinteraction.LIAConfigManager")
-        kLIAConfigManager.declaredMethods.single {
-            it.paramCount == 1 && it.returnType == List::class.java
-        }.hookReturnConstant(null)
+        if (requireMinQQVersion(QQVersion.QQ_9_0_8)) {
+            kLIAConfigManager.declaredMethods.single {
+                it.paramCount == 1 && it.returnType == java.util.List::class.java
+            }.hookReturnConstant(emptyList<Any>())
+        } else {
+            DexKit.requireMethodFromCache(DisableLightInteractionMethod).hookReturnConstant(null)
+        }
         return true
     }
 

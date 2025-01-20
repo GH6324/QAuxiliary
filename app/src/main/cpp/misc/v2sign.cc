@@ -14,9 +14,6 @@
 #include "zip_helper.h"
 #include "md5.h"
 
-#ifndef MODULE_SIGNATURE
-#define MODULE_SIGNATURE 294E0ABF933AAA14C6EB986A005E5CCB
-#endif
 #define PKG_NAME "io.github.qauxv"
 #define __STRING(x) #x
 #define STRING(x) __STRING(x)
@@ -25,6 +22,14 @@
 static_assert(sizeof(void *) == 8, "64-bit pointer size expected");
 #else
 static_assert(sizeof(void *) == 4, "32-bit pointer size expected");
+#endif
+
+#if defined(NDEBUG) || defined(TEST_SIGNATURE)
+#if !defined(MODULE_SIGNATURE)
+#error "MODULE_SIGNATURE must be defined for release build, but no signature key digest found in the signing config."
+#error "Please set it in the signing config in build.gradle, or set it in local.properties with key 'qauxv.signature.md5digest'"
+#endif
+static_assert(sizeof(STRING(MODULE_SIGNATURE)) == 33);
 #endif
 
 namespace qauxv::utils {
@@ -70,7 +75,7 @@ namespace teble::v2sign {
     const uint32_t v2Id = 0x7109871a;
 
     std::string getModulePath(JNIEnv *env) {
-        jclass cMainHook = env->FindClass("io/github/qauxv/startup/HookEntry");
+        jclass cMainHook = env->FindClass("io/github/qauxv/core/MainHook");
         jclass cClass = env->FindClass("java/lang/Class");
         jmethodID mGetClassLoader = env->GetMethodID(cClass, "getClassLoader",
                                                      "()Ljava/lang/ClassLoader;");

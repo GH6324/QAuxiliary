@@ -5,8 +5,8 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import cc.ioctl.util.HookUtils;
-import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
+import io.github.qauxv.util.xpcompat.XC_MethodHook;
+import io.github.qauxv.util.xpcompat.XposedBridge;
 import io.github.qauxv.base.annotation.FunctionHookEntry;
 import io.github.qauxv.base.annotation.UiItemAgentEntry;
 import io.github.qauxv.dsl.FunctionEntryRouter;
@@ -36,7 +36,8 @@ public class HookQWallet extends CommonSwitchFunctionHook {
                 // 预防广告视图显示导致的黑屏
                 // public final QWalletHomePreviewController.?(QWallBaseFragment|QWalletBaseFragment)Z
                 Method methodIsShowAdView = ArraysKt.single(kQWalletHomePreviewController.getDeclaredMethods(),
-                        it -> it.getReturnType() == boolean.class && it.getParameterTypes().length == 1 &&
+                        it -> it.getReturnType() == boolean.class &&
+                                it.getParameterTypes().length == 1 &&
                                 it.getParameterTypes()[0].getSimpleName().endsWith("BaseFragment"));
                 HookUtils.hookBeforeIfEnabled(this, methodIsShowAdView, param -> param.setResult(true));
             }
@@ -45,6 +46,7 @@ public class HookQWallet extends CommonSwitchFunctionHook {
                 // 加载广告及视图初始化
                 param.setResult(null);
             });
+            return true;
         }
         // 高版本 已测试 8.8.50
         Class<?> aClass = Initiator.load("Lcom/tencent/mobileqq/qwallet/config/impl/QWalletConfigServiceImpl;");

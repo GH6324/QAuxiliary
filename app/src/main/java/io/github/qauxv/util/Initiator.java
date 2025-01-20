@@ -83,6 +83,16 @@ public class Initiator {
         }
     }
 
+    public static boolean checkHostHasClass(String className) {
+        ClassLoader hostClassLoader = getHostClassLoader();
+        try {
+            hostClassLoader.loadClass(className);
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
     /**
      * Load a class, if the class is not found, a ClassNotFoundException will be thrown.
      *
@@ -234,7 +244,9 @@ public class Initiator {
                 "com.tencent.mobileqq.h3.a.a",
                 "com.tencent.mobileqq.g3.a.a",
                 "com.tencent.mobileqq.i3.a.a",
-                "com.tencent.mobileqq.j3.a.a"
+                "com.tencent.mobileqq.j3.a.a",
+                // QQ 9.1.28.21880 (8398) gray
+                "du3.a",
         };
         for (String candidate : candidates) {
             Class<?> klass = load(candidate);

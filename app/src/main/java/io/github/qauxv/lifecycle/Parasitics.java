@@ -53,7 +53,8 @@ import androidx.annotation.RequiresApi;
 import cc.ioctl.util.HostInfo;
 import io.github.qauxv.R;
 import io.github.qauxv.core.MainHook;
-import io.github.qauxv.startup.HookEntry;
+import io.github.qauxv.poststartup.StartupInfo;
+import io.github.qauxv.util.PackageConstants;
 import io.github.qauxv.ui.WindowIsTranslucent;
 import io.github.qauxv.util.Initiator;
 import io.github.qauxv.util.Log;
@@ -113,7 +114,7 @@ public class Parasitics {
             return;
         } catch (Resources.NotFoundException ignored) {
         }
-        String sModulePath = HookEntry.getModulePath();
+        String sModulePath = StartupInfo.getModulePath();
         if (sModulePath == null) {
             throw new RuntimeException("get module path failed, loader=" + MainHook.class.getClassLoader());
         }
@@ -152,7 +153,19 @@ public class Parasitics {
             }
         }
         SyncUtils.runOnUiThread(() -> {
-            res.addLoaders(ResourcesLoaderHolderApi30.sResourcesLoader);
+            try {
+                res.addLoaders(ResourcesLoaderHolderApi30.sResourcesLoader);
+                // TODO: 2024-07-01 invest why Resources.addLoaders() will throw IllegalArgumentException
+            } catch (IllegalArgumentException e) {
+                String expected1 = "Cannot modify resource loaders of ResourcesImpl not registered with ResourcesManager";
+                if (expected1.equals(e.getMessage())) {
+                    Log.e(e);
+                    // fallback to below API 30
+                    injectResourcesBelowApi30(res, path);
+                } else {
+                    throw e;
+                }
+            }
             try {
                 res.getString(R.string.res_inject_success);
                 if (sResInjectEndTime == 0) {
@@ -384,18 +397,19 @@ public class Parasitics {
                 Intent intent = (Intent) field_intent.get(activityClientRecord);
                 assert intent != null;
                 Bundle bundle = null;
+                Intent cloneIntent = new Intent(intent);
                 try {
                     Field fExtras = Intent.class.getDeclaredField("mExtras");
                     fExtras.setAccessible(true);
-                    bundle = (Bundle) fExtras.get(intent);
+                    bundle = (Bundle) fExtras.get(cloneIntent);
                 } catch (Exception e) {
                     Log.e(e);
                 }
                 if (bundle != null) {
                     bundle.setClassLoader(Initiator.getHostClassLoader());
                     // we do NOT have a custom Bundle, but the host may have
-                    if (intent.hasExtra(ActProxyMgr.ACTIVITY_PROXY_INTENT)) {
-                        Intent realIntent = intent.getParcelableExtra(ActProxyMgr.ACTIVITY_PROXY_INTENT);
+                    if (cloneIntent.hasExtra(ActProxyMgr.ACTIVITY_PROXY_INTENT)) {
+                        Intent realIntent = cloneIntent.getParcelableExtra(ActProxyMgr.ACTIVITY_PROXY_INTENT);
                         field_intent.set(activityClientRecord, realIntent);
                     }
                 }
@@ -434,18 +448,19 @@ public class Parasitics {
             fmIntent.setAccessible(true);
             Intent wrapper = (Intent) fmIntent.get(item);
             assert wrapper != null;
+            Intent cloneIntent = (Intent) wrapper.clone();
             Bundle bundle = null;
             try {
                 Field fExtras = Intent.class.getDeclaredField("mExtras");
                 fExtras.setAccessible(true);
-                bundle = (Bundle) fExtras.get(wrapper);
+                bundle = (Bundle) fExtras.get(cloneIntent);
             } catch (Exception e) {
                 Log.e(e);
             }
             if (bundle != null) {
                 bundle.setClassLoader(Initiator.getHostClassLoader());
-                if (wrapper.hasExtra(ActProxyMgr.ACTIVITY_PROXY_INTENT)) {
-                    Intent realIntent = wrapper.getParcelableExtra(ActProxyMgr.ACTIVITY_PROXY_INTENT);
+                if (cloneIntent.hasExtra(ActProxyMgr.ACTIVITY_PROXY_INTENT)) {
+                    Intent realIntent = cloneIntent.getParcelableExtra(ActProxyMgr.ACTIVITY_PROXY_INTENT);
                     fmIntent.set(item, realIntent);
                     if (Build.VERSION.SDK_INT >= 31) {
                         IBinder token = (IBinder) clientTransaction.getClass().getMethod("getActivityToken").invoke(clientTransaction);

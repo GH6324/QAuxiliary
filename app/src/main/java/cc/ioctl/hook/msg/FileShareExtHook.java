@@ -37,8 +37,6 @@ import cc.ioctl.util.HookUtils;
 import cc.ioctl.util.HostInfo;
 import cc.ioctl.util.Reflex;
 import cc.ioctl.util.ui.FaultyDialog;
-import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
 import io.github.qauxv.R;
 import io.github.qauxv.activity.ShadowShareFileAgentActivity;
 import io.github.qauxv.base.annotation.FunctionHookEntry;
@@ -56,6 +54,8 @@ import io.github.qauxv.util.dexkit.DefaultFileModel;
 import io.github.qauxv.util.dexkit.DexKit;
 import io.github.qauxv.util.dexkit.DexKitTarget;
 import io.github.qauxv.util.dexkit.FileBrowserActivity_InnerClass_onItemClick;
+import io.github.qauxv.util.xpcompat.XC_MethodHook;
+import io.github.qauxv.util.xpcompat.XposedBridge;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -89,6 +89,12 @@ public class FileShareExtHook extends CommonSwitchFunctionHook {
         return "[QQ>=8.8.80]为聊天文件菜单添加分享至其他应用";
     }
 
+    @Nullable
+    @Override
+    public String[] getExtraSearchKeywords() {
+        return new String[]{"跨应用分享文件"};
+    }
+
     @NonNull
     @Override
     public String[] getUiItemLocation() {
@@ -112,7 +118,11 @@ public class FileShareExtHook extends CommonSwitchFunctionHook {
         Class<?> kFileBrowserModelBase = Initiator.loadClass("com.tencent.mobileqq.filemanager.fileviewer.model.FileBrowserModelBase");
         Class<?> kDefaultFileModel = DexKit.requireClassFromCache(DefaultFileModel.INSTANCE);
         String fileViewerAdapterClassName;
-        if (requireMinQQVersion(QQVersion.QQ_9_0_15)) {
+        if (requireMinQQVersion(QQVersion.QQ_9_1_5_BETA_20015)) {
+            fileViewerAdapterClassName = "com.tencent.mobileqq.filemanager.fileviewer.i";
+        } else if (requireMinQQVersion(QQVersion.QQ_9_0_80)) {
+            fileViewerAdapterClassName = "com.tencent.mobileqq.filemanager.fileviewer.h";
+        } else if (requireMinQQVersion(QQVersion.QQ_9_0_15)) {
             fileViewerAdapterClassName = "com.tencent.mobileqq.filemanager.fileviewer.g";
         } else if (requireMinQQVersion(QQVersion.QQ_8_9_0)) {
             fileViewerAdapterClassName = "com.tencent.mobileqq.filemanager.fileviewer.h";

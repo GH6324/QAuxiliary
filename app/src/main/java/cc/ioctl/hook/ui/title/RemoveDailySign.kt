@@ -29,7 +29,7 @@ import com.github.kyuubiran.ezxhelper.utils.findMethod
 import com.github.kyuubiran.ezxhelper.utils.getObjectAs
 import com.github.kyuubiran.ezxhelper.utils.hookAfter
 import com.github.kyuubiran.ezxhelper.utils.setViewZeroSize
-import de.robv.android.xposed.XposedBridge
+import io.github.qauxv.util.xpcompat.XposedBridge
 import io.github.qauxv.base.annotation.FunctionHookEntry
 import io.github.qauxv.base.annotation.UiItemAgentEntry
 import io.github.qauxv.dsl.FunctionEntryRouter
@@ -56,10 +56,15 @@ object RemoveDailySign : CommonSwitchFunctionHook("kr_remove_daily_sign") {
         val callback = HookUtils.afterIfEnabled(this) { param ->
             // em_drawer_sign_up
             val dailySignName = when {
-                requireMinQQVersion(QQVersion.QQ_9_0_20) -> "a0"
+                requireMinQQVersion(QQVersion.QQ_9_1_30) -> "c0"//9.1.30
+                requireMinQQVersion(QQVersion.QQ_9_0_90) -> "b0"//9.0.90~9.1.25
+                requireMinQQVersion(QQVersion.QQ_9_0_85) -> "d0"//9.0.85
+                requireMinQQVersion(QQVersion.QQ_9_0_35) -> "c0"//9.0.35~9.0.81
+                requireMinQQVersion(QQVersion.QQ_9_0_20) -> "a0"//9.0.20~9.0.30
+                requireMinQQVersion(QQVersion.QQ_9_0_0) -> "b0"//9.0.0~9.0.17
                 requireMinQQVersion(QQVersion.QQ_8_9_90) -> "e0"
                 requireMinQQVersion(QQVersion.QQ_8_9_88) -> "h0"
-                requireMinQQVersion(QQVersion.QQ_8_9_70) -> "e0"
+                requireMinQQVersion(QQVersion.QQ_8_9_70) -> "h0"
                 requireMinQQVersion(QQVersion.QQ_8_9_68) -> "h0"
                 requireMinQQVersion(QQVersion.QQ_8_9_28) -> "i0"
                 requireMinQQVersion(QQVersion.QQ_8_9_25) -> "h0"
