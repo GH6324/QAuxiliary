@@ -57,7 +57,7 @@ jobs:
       - name: Install ccache
         run: |
           sudo apt install -y ccache ninja-build
-          ccache -o max_size=1G
+          ccache -o max_size=1.5G
           ccache -o hash_dir=false
           ccache -o hard_link=true
           ccache -o compiler_check='%compiler% -dumpmachine; %compiler% -dumpversion'
