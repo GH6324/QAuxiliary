@@ -148,6 +148,18 @@ public final class RemoveShakeAdExampleHook extends CommonSwitchFunctionHook {
    [这里](https://docs.github.com/cn/github/authenticating-to-github/managing-commit-signature-verification).
    如果你实在不会配置 GPG/SSH 签名，你仍然可以提交 PR, 但由于 main 分支要求所有 commit 必须附着有效的 GPG/SSH 签名，就只好由我们来代替你签名了.
 
+## Commit Message 推荐性标准
+
+1. 本部分(Commit Message 规范)是推荐性标准(T as in GB/T), 不是强制性标准, 你可以选择遵循或者不遵循。
+2. 使用简洁的英文描述 commit 干了什么，请不要使用中文。
+3. 使用 "scope: description" 的格式, 其中 scope 是 commit 的范围, description 是 commit 的简短描述;
+  其中 scope 为 "功能名" 或者 "子系统名", 例如: "RemoveShakeAdExampleHook" 或者 "loader/api100",
+  decription 为简短的英文描述, 例如: "support QQ 8.9.80" 或者 "fix crash on QQ 8.9.80";
+  合起来就是 "RemoveShakeAdExampleHook: support QQ 8.9.80" 或者 "loader/api100: fix entry on LSPosed v2.1.0";
+4. 如果 commit 需要附带详细描述, 请在 description 后面加上两个换行，就像经典的 commit message 那样(通常你不需要写那么详细);
+5. 不建议使用诸如 `fix(compiler): prevent namespaced SVG <style> elements from being stripped` 这样的 conventional 风格的 commit message;
+6. 更多关于 commit message 的写法, 请参考 [Stop Using Conventional Commits](https://sumnerevans.com/posts/software-engineering/stop-using-conventional-commits/).
+
 ## Pull Request
 
 1. 请勿在修改会被编译分发至用户的部分时在 PR 标题添加 [skip ci]；请务必在文档、模板等不会影响编译流程和实际分发的目标生成，或完全无法编译但出于必要目的必须提交的 PR 标题添加 [skip ci]
