@@ -52,7 +52,7 @@ object HideJoinTroopBriefContent : CommonSwitchFunctionHook() {
                     parameters(View::class.java)
             }.hookAfterIfEnabled(this) { param ->
                 val view = param.thisObject.singleField {
-                    name == "n"
+                    name("n")
                 }.get(param.thisObject) as View
                 view.visibility = ViewGroup.GONE
             }

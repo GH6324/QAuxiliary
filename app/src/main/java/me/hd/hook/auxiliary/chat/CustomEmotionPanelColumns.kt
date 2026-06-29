@@ -46,6 +46,7 @@ import me.hd.util.singleConstructor
 import me.hd.util.singleField
 import me.hd.util.singleMethod
 import me.hd.util.toHostClass
+import me.hd.util.type
 
 @FunctionHookEntry
 @UiItemAgentEntry
@@ -120,8 +121,8 @@ object CustomEmotionPanelColumns : CommonConfigFunctionHook() {
             }.hookBeforeIfEnabled(this) { param ->
                 val panelInfo = param.args[1] ?: return@hookBeforeIfEnabled
                 val panelType = panelInfo.singleField {
-                    type == Int::class.java &&
-                        name == "type"
+                    type(Int::class.java) &&
+                        name("type")
                 }.get(panelInfo) as Int
                 if (panelType in TARGET_PANEL_TYPES) {
                     param.result = columnCount
@@ -134,8 +135,8 @@ object CustomEmotionPanelColumns : CommonConfigFunctionHook() {
                 val adapter = param.thisObject
                 // 收藏面板新UI会将单个格子宽度固定为64dp 关闭后才会自适应
                 adapter.singleField {
-                    type == Boolean::class.java &&
-                        name == "isNewUISwitchOn"
+                    type(Boolean::class.java) &&
+                        name("isNewUISwitchOn")
                 }.set(adapter, false)
             }
         return true

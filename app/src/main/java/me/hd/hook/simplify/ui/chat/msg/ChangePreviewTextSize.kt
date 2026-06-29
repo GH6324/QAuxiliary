@@ -38,6 +38,7 @@ import me.hd.util.returnType
 import me.hd.util.singleField
 import me.hd.util.singleMethod
 import me.hd.util.toHostClass
+import me.hd.util.type
 
 @FunctionHookEntry
 @UiItemAgentEntry
@@ -54,7 +55,7 @@ object ChangePreviewTextSize : CommonSwitchFunctionHook() {
                     parameters(Bundle::class.java)
             }.hookAfterIfEnabled(this) { param ->
                 val containerView = param.thisObject.singleField {
-                    type == "com.tencent.qqnt.textpreview.PreviewTextContainerView".toHostClass()
+                    type("com.tencent.qqnt.textpreview.PreviewTextContainerView".toHostClass())
                 }.get(param.thisObject)!!
                 val textView = containerView.singleMethod {
                     returnType(TextView::class.java) &&

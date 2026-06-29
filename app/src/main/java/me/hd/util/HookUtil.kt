@@ -92,7 +92,7 @@ internal val Member.isStatic
 
 internal fun Constructor<*>.parameterCount(
     count: Int
-) = parameterTypes.size == count
+) = this.parameterTypes.size == count
 
 internal fun Constructor<*>.parameters(
     vararg types: Class<*>?
@@ -102,7 +102,7 @@ internal fun Constructor<*>.parameters(
 
 internal fun Method.returnType(
     type: Class<*>
-) = returnType == type
+) = this.returnType == type
 
 internal fun Method.name(
     name: String
@@ -110,13 +110,21 @@ internal fun Method.name(
 
 internal fun Method.parameterCount(
     count: Int
-) = parameterTypes.size == count
+) = this.parameterTypes.size == count
 
 internal fun Method.parameters(
     vararg types: Class<*>?
 ) = parameterCount(types.size) && parameterTypes.indices.all { index ->
     types[index] == null || parameterTypes[index] == types[index]
 }
+
+internal fun Field.type(
+    type: Class<*>
+) = this.type == type
+
+internal fun Field.name(
+    name: String
+) = this.name == name
 
 
 internal fun Member.hookBeforeIfEnabled(

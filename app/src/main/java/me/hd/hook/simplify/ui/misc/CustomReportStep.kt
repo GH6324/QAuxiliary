@@ -32,6 +32,7 @@ import io.github.qauxv.util.requireMinQQVersion
 import me.hd.util.hookBeforeIfEnabled
 import me.hd.util.singleField
 import me.hd.util.toHostMethod
+import me.hd.util.type
 
 @FunctionHookEntry
 @UiItemAgentEntry
@@ -48,7 +49,7 @@ object CustomReportStep : CommonSwitchFunctionHook(
             .hookBeforeIfEnabled(this) { param ->
                 val instance = param.thisObject
                 instance.singleField {
-                    type == Int::class.java
+                    type(Int::class.java)
                 }.set(instance, 88888)
             }
         return true
