@@ -80,8 +80,10 @@ object MiniAppToStruckMsg : BaseSwitchFunctionDecorator(), IItemBuilderFactoryHo
             val metaObj = jsonObj.optJSONObject("meta") ?: return false
             val prompt = jsonObj.optString("prompt") ?: "未知小程序"
             val detailObj = metaObj.optJSONObject("detail_1") // [QQ小程序]
+            val qqUrl = detailObj?.optString("qqdocurl") ?: detailObj?.optString("url")
             val miniAppObj = metaObj.optJSONObject("miniapp") // [微信小程序]
-            val url = detailObj?.optString("url") ?: miniAppObj?.optString("jumpUrl") ?: "暂无链接"
+            val wxUrl = miniAppObj?.optString("jumpUrl")
+            val url = qqUrl ?: wxUrl ?: "解析链接异常"
             msgRecord.apply {
                 elements.apply {
                     clear()
