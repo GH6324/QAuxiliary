@@ -19,6 +19,13 @@
         "com.google.flatbuffers:flatbuffers-java"
       ],
       "enabled": false
+    },
+    {
+      "matchPackagePatterns": [
+        "*"
+      ],
+      "groupName": "all dependencies",
+      "groupSlug": "all-dependencies"
     }
   ]
 }
