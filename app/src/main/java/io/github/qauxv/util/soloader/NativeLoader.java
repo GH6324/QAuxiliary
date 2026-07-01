@@ -478,7 +478,7 @@ public class NativeLoader {
                 Throwable cause = e.getTargetException();
                 Log.w("Failed to load native library after extraction", cause);
                 // always treat as fatal error
-                throw IoUtils.unsafeThrow(e);
+                throw IoUtils.unsafeThrow(cause);
             } catch (IllegalAccessException e) {
                 // should not happen
                 throw IoUtils.unsafeThrow(e);
@@ -498,7 +498,7 @@ public class NativeLoader {
             Throwable cause = e.getTargetException();
             Log.w("Failed to attach primary native library", cause);
             // always treat as fatal error
-            throw IoUtils.unsafeThrow(e);
+            throw IoUtils.unsafeThrow(cause);
         } catch (IllegalAccessException e) {
             // should not happen
             throw IoUtils.unsafeThrow(e);

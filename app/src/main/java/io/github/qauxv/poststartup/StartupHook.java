@@ -72,8 +72,14 @@ public class StartupHook {
         if (sSecondStageInit) {
             throw new IllegalStateException("Second stage init already executed");
         }
-        HybridClassLoader.setHostClassLoader(ctx.getClassLoader());
-        StartupRoutine.execPostStartupInit(ctx, step, lpwReserved, bReserved);
+        try {
+            HybridClassLoader.setHostClassLoader(ctx.getClassLoader());
+            StartupRoutine.execPostStartupInit(ctx, step, lpwReserved, bReserved);
+        } catch (Exception | LinkageError | AssertionError e) {
+            // for easier debug
+            log_e(e);
+            throw e;
+        }
         sSecondStageInit = true;
         applyTargetDpiIfNecessary(ctx);
         deleteDirIfNecessaryNoThrow(ctx);
