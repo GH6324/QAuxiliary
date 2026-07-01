@@ -57,7 +57,8 @@ const ModuleSymbolResolver* GetModuleSymbolResolver(std::string_view module_name
         }
     }
     ::utils::ProcessView processView;
-    if (processView.readProcess(getpid()) != 0) {
+    if (int rc = processView.readProcess(getpid()); rc != 0) {
+        LOGW("ProcessView::readProcess failed, rc = {}", rc);
         return nullptr;
     }
     std::string path;
@@ -69,12 +70,36 @@ const ModuleSymbolResolver* GetModuleSymbolResolver(std::string_view module_name
         }
     }
     if (path.empty() || baseAddress == nullptr) {
+#if QAUXV_ART_SYMBOL_RESOLVER_DEBUG
+        LOGW("GetModuleSymbolResolver: module '{}' not found in process maps", module_name);
+        // do a simple dump /proc/pid/maps | grep soname with ART_SYMBOL_RESOLVER_LOGD
+        int pid = getpid();
+        auto mapsPath = fmt::format("/proc/{}/maps", pid);
+        std::vector<std::string> relatedLines;
+        FILE* pf = fopen(mapsPath.c_str(), "r");
+        if (pf) {
+            char buffer[4096];
+            while (fgets(buffer, sizeof(buffer), pf)) {
+                if (strstr(buffer, module_name.data())) {
+                    relatedLines.emplace_back(buffer);
+                }
+            }
+            fclose(pf);
+        }
+        ART_SYMBOL_RESOLVER_LOGD("Maps related to module '{}' ({} lines):", module_name, relatedLines.size());
+        // logd may randomly discard lines, add line numbers, dump 100 line for max in case of SW bug
+        for (size_t i = 0; i < relatedLines.size() && i < 100; ++i) {
+            ART_SYMBOL_RESOLVER_LOGD("  [{:02d}] {}", i, relatedLines[i]);
+        }
+        ART_SYMBOL_RESOLVER_LOGD("End of maps related to module '{}'", module_name);
+#endif
         return nullptr;
     }
     auto data = std::make_unique<ModuleInfoData>();
     // the file map will be un-map when the FileMemMap is destroyed
     FileMemMap fileMap;
-    if (fileMap.mapFilePath(path.c_str()) != 0) {
+    if (int rc = fileMap.mapFilePath(path.c_str()); rc != 0) {
+        LOGW("FileMemMap::mapFilePath '{}' failed for module '{}', rc = {}", path, module_name, rc);
         return nullptr;
     }
 #if QAUXV_ART_SYMBOL_RESOLVER_DEBUG
