@@ -23,7 +23,7 @@ jobs:
       CCACHE_NOHASHDIR: "true"
       CCACHE_HARDLINK: "true"
       CCACHE_BASEDIR: "${{ github.workspace }}"
-    if: ${{ !startsWith(github.event.head_commit.message, '[skip ci]') }} && success() && github.ref == 'refs/heads/main' }}
+    if: ${{ !startsWith(github.event.head_commit.message, '[skip ci]') && success() && github.ref == 'refs/heads/main' }}
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -86,7 +86,6 @@ jobs:
           echo ${{ secrets.SIGN_KEYSTORE_BASE64 }} | base64 -d > keystore.jks
           ./gradlew :app:synthesizeDistReleaseApksCI :app:extractReleaseNativeDebugMetadata
           ccache -s
-          echo "APK_FILE_ARM32=$(find app/build/outputs/ci -name '*arm32.apk')" >> $GITHUB_ENV
           echo "APK_FILE_ARM64=$(find app/build/outputs/ci -name '*arm64.apk')" >> $GITHUB_ENV
           echo "APK_FILE_ARMALL=$(find app/build/outputs/ci -name '*armAll.apk')" >> $GITHUB_ENV
           echo "APK_FILE_UNIVERSAL=$(find app/build/outputs/ci -name '*universal.apk')" >> $GITHUB_ENV
@@ -103,8 +102,6 @@ jobs:
           echo "### Build Success :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "|ABI|SHA256|" >> $GITHUB_STEP_SUMMARY
           echo "|:--------:|:----------|" >> $GITHUB_STEP_SUMMARY
-          arm32=($(sha256sum ${{ env.APK_FILE_ARM32 }}))
-          echo "|arm32|$arm32" >> $GITHUB_STEP_SUMMARY
           arm64=($(sha256sum ${{ env.APK_FILE_ARM64 }}))
           echo "|arm64|$arm64" >> $GITHUB_STEP_SUMMARY
           armAll=($(sha256sum ${{ env.APK_FILE_ARMALL }}))
@@ -112,11 +109,6 @@ jobs:
           universal=($(sha256sum ${{ env.APK_FILE_UNIVERSAL }}))
           echo "|universal|$universal" >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload Artifacts(arm32)
-        uses: actions/upload-artifact@v7
-        with:
-          path: ${{ env.APK_FILE_ARM32 }}
-          name: QAuxiliary-release-${{ github.event.head_commit.id }}-arm32
       - name: Upload Artifacts(arm64)
         uses: actions/upload-artifact@v7
         with:
@@ -166,7 +158,6 @@ jobs:
           COMMIT_URL: ${{ github.event.head_commit.url }}
         run: |
           ESCAPED=`python3 -c 'import json,os,urllib.parse; msg = json.dumps(os.environ["COMMIT_MESSAGE"]); print(urllib.parse.quote(msg if len(msg) <= 1024 else json.dumps(os.environ["COMMIT_URL"])))'`
-          export arm32=$(find artifacts -name "*arm32.apk")
           export arm64=$(find artifacts -name "*arm64.apk")
           export armAll=$(find artifacts -name "*armAll.apk")
           export universal=$(find artifacts -name "*universal.apk")
@@ -174,8 +165,7 @@ jobs:
           find artifacts -name "*.so.dbg" -print | zip "$SYMBOL_ZIP_NAME" -@
           chmod +x telegram-bot-api-binary
           ./telegram-bot-api-binary --api-id=21724 --api-hash=3e0cb5efcd52300aec5994fdfc5bdc16 --local 2>&1 > /dev/null &
-          curl -v "http://127.0.0.1:8081/bot${{ secrets.TELEGRAM_TOKEN  }}/sendMediaGroup?chat_id=-1001732413298&media=%5B%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2Farm64%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2Farm32%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2FarmAll%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2Funiversal%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2Fsymbol%22%2C%22parse_mode%22%3A%22MarkdownV2%22%2C%22caption%22:${ESCAPED}%7D%5D" \
-           -F arm32="@$arm32" \
+          curl -v "http://127.0.0.1:8081/bot${{ secrets.TELEGRAM_TOKEN  }}/sendMediaGroup?chat_id=-1001732413298&media=%5B%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2Farm64%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2FarmAll%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2Funiversal%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2Fsymbol%22%2C%22parse_mode%22%3A%22MarkdownV2%22%2C%22caption%22:${ESCAPED}%7D%5D" \
            -F arm64="@$arm64" \
            -F armAll="@$armAll" \
            -F universal="@$universal" \
