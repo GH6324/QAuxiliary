@@ -137,6 +137,8 @@ public final class RemoveShakeAdExampleHook extends CommonSwitchFunctionHook {
 }
 ```
 
+QQ 是个多进程的应用，其进程通常有主进程（大部分 UI 和逻辑都在主进程）、MSF(":MSF", 与服务端对接，处理消息收发协议封包相关)、peak(":peak", 查看图片等)、":tool", ":mini" 等。CommonSwitchFunctionHook 的 constructor 有一个 targetProc 参数用于表示这个 hook 应该在哪个进程中运行，默认是主进程，如果你想在其他进程中运行，请在 constructor 中传入对应的进程 bit mask，如 `targetProc = SyncUtils.PROC_MAIN or SyncUtils.PROC_MSF`(kotlin) 或者 `super(SyncUtils.PROC_MAIN | SyncUtils.PROC_MSF, ...)`(java)。其中 `SyncUtils.PROC_ANY` 表示所有进程，仅建议在开发阶段使用，生产环境不建议使用，hook 太多了会导致 QQ 启动变慢。
+
 ## Commit 相关
 
 1. 类名、变量名、方法名禁止中文/拼音(例外: 如果 QQ 的 API 本身就是拼音的, 那么就只能用拼音了)
