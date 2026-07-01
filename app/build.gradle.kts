@@ -175,6 +175,7 @@ android {
             println("No Signature Digest Configured")
         }
         getByName("release") {
+            //noinspection NotShrinkingResources
             isShrinkResources = false
             isMinifyEnabled = false
             proguardFiles("proguard-rules.pro")
@@ -213,6 +214,9 @@ android {
                     }
                 }
             }
+            //noinspection NotShrinkingResources
+            isShrinkResources = false
+            isMinifyEnabled = false
             isCrunchPngs = false
             proguardFiles("proguard-rules.pro")
             var debugFlags = arrayOf<String>(
