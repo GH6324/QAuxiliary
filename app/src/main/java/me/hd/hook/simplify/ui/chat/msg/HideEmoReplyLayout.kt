@@ -42,7 +42,7 @@ object HideEmoReplyLayout : CommonSwitchFunctionHook(
     override val name = "隐藏表情表态"
     override val description = "隐藏消息底部的表情回应布局"
     override val uiItemLocation = FunctionEntryRouter.Locations.Simplify.UI_CHAT_MSG
-    override val isAvailable = requireMinQQVersion(QQVersion.QQ_9_1_35)
+    override val isAvailable = requireMinQQVersion(QQVersion.QQ_9_1_0)
 
     override fun initOnce(): Boolean {
         Hd_HideEmoReplyLayout_Method.toHostMethod()

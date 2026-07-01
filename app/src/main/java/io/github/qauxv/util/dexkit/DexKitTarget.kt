@@ -1197,12 +1197,12 @@ data object Hd_HideEmoReplyLayout_Method : DexKitTarget.UsingDexKitBridge() {
         bridge.findClass {
             searchPackages("com.tencent.mobileqq.aio.msglist.holder.template")
             matcher {
-                usingStrings("AIOReceiverBubbleTemplate", "mBinding.msgTailContainer")
+                usingStrings("AIOReceiverBubbleTemplate", "msgTailContainer")
             }
         }.findMethod {
             matcher {
                 returnType(View::class.java)
-                usingStrings("mBinding.msgTailContainer")
+                usingStrings("msgTailContainer")
             }
         }.single()
     }
